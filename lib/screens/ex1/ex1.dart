@@ -15,6 +15,7 @@ class _Ex1PageState extends State<Ex1Page> {
   late Stopwatch stopwatch;
   var timeElapsed = const Duration(microseconds: 0);
   var lapList = [];
+  var isRunning = false;
   @override
   void initState() {
     stopwatch = Stopwatch();
@@ -23,21 +24,23 @@ class _Ex1PageState extends State<Ex1Page> {
     super.initState();
   }
 
+  @override
+  void dispose() {
+    stopwatch.stop();
+    timer.cancel();
+    super.dispose();
+  }
+
   void timerCallback(Timer timer) {
     if (stopwatch.isRunning) {
       setState(() {
         timeElapsed = stopwatch.elapsed;
       });
-    } else if (stopwatch.elapsedTicks != 0) {
-      stopwatch.reset();
-
-      setState(() {
-        lapList.clear();
-        timeElapsed = const Duration(milliseconds: 0);
-      });
     }
   }
 
+  /// Convert time elapse to Min:Second:Milli format.
+  ///
   String formatTime() {
     String pad2(text) => text.toString().padLeft(2, '0');
     var milli = timeElapsed.inMilliseconds.remainder(1000) ~/ 10;
@@ -93,10 +96,11 @@ class _Ex1PageState extends State<Ex1Page> {
                   SizedBox(
                       width: 80,
                       height: 80,
-                      child: StyleButton(
-                        forcedColor: Colors.white.withOpacity(0.15),
-                        forecedText: "ラップ",
-                        forcedTextColor: Colors.white70,
+                      child: StyleButton2(
+                        backColors: Colors.white,
+                        useOpacity: 0.15,
+                        buttonText: "ラップ",
+                        textColor: Colors.white70,
                         onTap: () {
                           if (stopwatch.isRunning) {
                             lapList.add(formatTime());
@@ -125,12 +129,12 @@ class _Ex1PageState extends State<Ex1Page> {
                   SizedBox(
                       width: 80,
                       height: 80,
-                      child: StyleButton(
-                        stopwatch: stopwatch,
-                        startText: '開始',
-                        startColor: Colors.green,
-                        stopText: '停止',
-                        stopColor: Colors.red,
+                      child: StyleButton2(
+                        backColors: isRunning ? Colors.red : Colors.green,
+                        textColor: isRunning ? Colors.red : Colors.green,
+                        buttonText: isRunning ? '停止' : '開始',
+                        useOpacity: 0.3,
+                        onTap: onStartStopTap,
                       ))
                 ],
               ),
@@ -141,14 +145,13 @@ class _Ex1PageState extends State<Ex1Page> {
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      var h = constraints.maxHeight;
-                      int memoNum = (h ~/ (20 + 16));
-                      // height of  Divider = 16
-                      var memoHeight = (h ~/ (memoNum)) - 1.0;
-                      var toatlNum =
-                          lapList.length > memoNum ? lapList.length : memoNum;
+                      var h = constraints.maxHeight;                                //  height of  Divider = 16.
+                      int lineNum = (h ~/ (20 + 16));                               //  calculate the number of line to be filled in the bottom.
+                      var lineHeight = (h ~/ (lineNum)) - 1.0;                      //  the height of each lap's line.
+                      var totalLineItem =                                           //  if number of laps > calculated lineNum.
+                          lapList.length > lineNum ? lapList.length : lineNum;      //  totalLineItem = the number of laps.
                       return ListView.builder(
-                        itemCount: toatlNum * 2,
+                        itemCount: totalLineItem * 2,
                         itemBuilder: (context, i) {
                           if (i.isEven) {
                             return const Divider(
@@ -158,7 +161,7 @@ class _Ex1PageState extends State<Ex1Page> {
                           }
                           var index = i ~/ 2;
                           return SizedBox(
-                              height: memoHeight,
+                              height: lineHeight,
                               child: Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
@@ -189,41 +192,40 @@ class _Ex1PageState extends State<Ex1Page> {
       )),
     );
   }
+
+  void onStartStopTap() {
+    if (stopwatch.isRunning) {
+      stopwatch.stop();
+      setState(() {
+        isRunning = false;
+      });
+    } else {
+      stopwatch.reset();
+      stopwatch.start();
+      setState(() {
+        lapList.clear();
+        isRunning = true;
+      });
+    }
+  }
 }
 
-class StyleButton extends StatelessWidget {
-  const StyleButton(
+class StyleButton2 extends StatelessWidget {
+  const StyleButton2(
       {Key? key,
-      this.stopwatch,
-      this.forcedColor,
-      this.startColor,
-      this.stopColor,
-      this.startText,
-      this.stopText,
-      this.forecedText,
-      this.forcedTextColor,
-      this.onTap})
+      required this.backColors,
+      required this.buttonText,
+      required this.textColor,
+      this.onTap,
+      this.useOpacity = 1})
       : super(key: key);
-
-  final Stopwatch? stopwatch;
-  final Color? forcedColor;
-  final Color? forcedTextColor;
-  final String? forecedText;
-  final Color? startColor;
-  final Color? stopColor;
-  final String? startText;
-  final String? stopText;
+  final Color backColors;
+  final Color textColor;
+  final String buttonText;
   final Function? onTap;
+  final double useOpacity;
   @override
   Widget build(BuildContext context) {
-    late Color backColors;
-    late String buttonText;
-
-    if (stopwatch != null) {
-      var check = stopwatch!.isRunning;
-      backColors = check ? stopColor ?? Colors.red : startColor ?? Colors.green;
-      buttonText = check ? stopText ?? '' : startText ?? '';
-    }
     return OutlinedButton(
         style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.all(5),
@@ -231,15 +233,12 @@ class StyleButton extends StatelessWidget {
             shape: const CircleBorder(),
             side: BorderSide(
               width: 2.0,
-              color: forcedColor ?? backColors.withOpacity(0.3),
+              color: backColors.withOpacity(useOpacity),
             )),
         onPressed: () {
           if (onTap != null) {
             onTap!();
             return;
-          }
-          if (stopwatch != null) {
-            stopwatch!.isRunning ? stopwatch!.stop() : stopwatch!.start();
           }
         },
         child: LayoutBuilder(
@@ -248,11 +247,10 @@ class StyleButton extends StatelessWidget {
               width: constraints.maxWidth,
               height: constraints.maxHeight,
               decoration: BoxDecoration(
-                  color: forcedColor ?? backColors.withOpacity(0.3),
+                  color: backColors.withOpacity(useOpacity),
                   shape: BoxShape.circle),
               child: Center(
-                child: Text(forecedText ?? buttonText,
-                    style: TextStyle(color: forcedTextColor ?? backColors)),
+                child: Text(buttonText, style: TextStyle(color: textColor)),
               ),
             );
           },
